@@ -1,18 +1,19 @@
 import random
-import csv
 
-TABLE_SIZE = 50
+TABLE_SIZE = 5
 
-START_POS = 3;
-END_POS = TABLE_SIZE - 3
+START_POS = 0;
+END_POS = TABLE_SIZE-1
 
-global cities
 cities = []
+pointsDeDepart = {}
 
 def initCities():
     global cities
+    global pointsDeDepart
     cities = []
     processed = []
+    pointsDeDepart = {}
     
     for i in range(0, TABLE_SIZE):
         cities.insert(i, [])
@@ -23,7 +24,6 @@ def initCities():
             else:
                 cities[i].insert(j, 'rien')
     
-    chemins = []
     
     for i in range(0, TABLE_SIZE):
         for j in range(0, TABLE_SIZE):
@@ -31,16 +31,15 @@ def initCities():
                 for x in range(max([0, i-5]), min([i+5, TABLE_SIZE])):
                     for y in range(max([0, j-5]), min([j+5, TABLE_SIZE])):
                         string = (i*j)+(x*y)
-                        if (i != x or j != y) and string not in processed :
+                        if (i != x or j != y) :
                             if cities[x][y] == 'ville':
                                 processed.append(string)
+                                distance = (max([i, x]) - min([i, x]) + max([j, y]) - min([j, y]))
                                 
-                                for xx in range(min([i, x]), max([i, x])):
-                                    if cities[xx][j] != 'ville':
-                                        distance = (max([i, x]) - min([i, x]) + max([j, y]) - min([j, y])) - 1
-                                        cities[xx][j] = distance
-
-                                        chemins.append({
+                                if f'{i}{j}' not in pointsDeDepart.keys(): 
+                                    pointsDeDepart[f'{i}{j}'] = {}
+                                
+                                data = {
                                             'prev': {
                                                 'x': i,
                                                 'y': j
@@ -50,31 +49,62 @@ def initCities():
                                                 'y': y
                                             },
                                             'distance': distance
-                                        })
+                                        }
+                                
+                                # if f'{x}{y}' in pointsDeDepart[f'{i}{j}'].keys():
+                                #     print('Continue')
+                                #     continue
+                                    
+                                for xx in range(min([i, x]), max([i, x])):
+                                    if cities[xx][j] != 'ville':
+                                        cities[xx][j] = distance
+                                        pointsDeDepart[f'{i}{j}'][f'{x}{y}'] = data
                                 
                                 for yy in range(min([j, y]), max([j+1, y+1])):
                                     if cities[x][yy] != 'ville':
-                                        distance = (max([i, x]) - min([i, x]) + max([j, y]) - min([j, y])) - 1
                                         cities[x][yy] = distance
-
-                                        chemins.append({
-                                            'prev': {
-                                                'x': i,
-                                                'y': j
-                                            },
-                                              'next': {
-                                                'x': x,
-                                                'y': y
-                                            },
-                                            'distance': distance
-                                        })
-                            # else:
-                            #     cities[x][y] = 'chemin'
+                                        pointsDeDepart[f'{i}{j}'][f'{x}{y}'] = data
+                                        
+    # for chemin in pointsDeDepart:
+    #     print(chemin, pointsDeDepart[chemin])
+    #     print('\n')
                                   
+def findPaths():
+    global cities, pointsDeDepart
+    traversed = []
+    
+    print(pointsDeDepart)
+    
+    # pointsDeDepart qui partent du point de départ (s)
+    chemins = pointsDeDepart[str(START_POS) + str(START_POS)]    
+    traversed.append(str(START_POS) + str(START_POS))
+    print('00')
+    indexChemin = '00'
+    
+    # Pour tous les chemins qui partent du départ
+    while (indexChemin != str(END_POS) + str(END_POS)) :
+        path = '00'
+        
+        for index in chemins:
+            chemin = chemins[index]
+            indexChemin = str(chemin['next']['x'])+str(chemin['next']['y'])
+            
+            if indexChemin == str(END_POS) + str(END_POS):
+                print('Found !', path + ' => ' + str(indexChemin))
+                path = '00'
+                break
+            
+            if indexChemin not in traversed:
+                path += ' => ' + indexChemin
+                traversed.append(indexChemin)
+                print(indexChemin, indexChemin == '44')
+                chemins = pointsDeDepart[indexChemin]
+                continue
+    
 def display():
     global cities
     
-    buffer = '  '
+    buffer = '   '
     for i in range(0, TABLE_SIZE):
         buffer = buffer + str(i).ljust(3, ' ')
         
@@ -96,7 +126,9 @@ def display():
         
         print(str(i).ljust(3, ' ') + buffer)
     print('\n◼ ville')
-    print('_ vide')
+    print('_ vide\n')
 
+        
 initCities()
 display()
+findPaths()
