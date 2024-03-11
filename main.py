@@ -71,13 +71,13 @@ def initCities():
                                   
 def findPaths():
     global cities, pointsDeDepart
-    traversed = []
+    traversed = {}
     
-    print(pointsDeDepart)
+    for i in pointsDeDepart:
+        print(i, pointsDeDepart[i], '\n')
     
     # pointsDeDepart qui partent du point de départ (s)
-    chemins = pointsDeDepart[str(START_POS) + str(START_POS)]    
-    traversed.append(str(START_POS) + str(START_POS))
+    chemins = pointsDeDepart[str(START_POS) + str(START_POS)]
     print('00')
     indexChemin = '00'
     
@@ -85,21 +85,22 @@ def findPaths():
     while (indexChemin != str(END_POS) + str(END_POS)) :
         path = '00'
         
+        if indexChemin not in traversed:
+            traversed[indexChemin] = {}
+        
         for index in chemins:
             chemin = chemins[index]
-            indexChemin = str(chemin['next']['x'])+str(chemin['next']['y'])
+            newIndexChemin = str(chemin['next']['x'])+str(chemin['next']['y']);
+            traversed[indexChemin] = newIndexChemin
             
             if indexChemin == str(END_POS) + str(END_POS):
                 print('Found !', path + ' => ' + str(indexChemin))
                 path = '00'
                 break
-            
-            if indexChemin not in traversed:
-                path += ' => ' + indexChemin
-                traversed.append(indexChemin)
-                print(indexChemin, indexChemin == '44')
+
+            if newIndexChemin not in traversed[indexChemin]:
                 chemins = pointsDeDepart[indexChemin]
-                continue
+                indexChemin = newIndexChemin
     
 def display():
     global cities
