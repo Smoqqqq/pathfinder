@@ -5,9 +5,18 @@ class GridPrinter:
         self.paddSize = 5
     
     def display(self, grid: dict) -> None:
-        buffer = '\n' + ''.ljust(self.paddSize, ' ')
-        for i in range(0, len(grid)):
-            buffer = buffer + str(i).ljust(self.paddSize, ' ')
+        buffer = ''
+        
+        if len(grid) > 50:
+            self.paddSize = 3
+            
+        if len(grid) > 100:
+            self.paddSize = 1
+        
+        if len(grid) < 100:
+            buffer = '\n' + ''.ljust(self.paddSize, ' ')
+            for i in range(0, len(grid)):
+                buffer = buffer + str(i).ljust(self.paddSize, ' ')
             
         print(buffer)
         
@@ -23,8 +32,10 @@ class GridPrinter:
                 else:
                     buffer = buffer + BgColor.GREEN + str(grid[i][j]).ljust(self.paddSize, ' ') + BgColor.END_COLOR
             
-            buffer = buffer + '\n'
+            if len(grid) < 100:
+                buffer = buffer + '\n'
             
             print(str(i).ljust(self.paddSize, ' ') + buffer)
+                
         print('\n◼ ville')
         print('_ vide\n')
