@@ -1,10 +1,65 @@
 from position import Position
 import heapq
+import time
+import numpy as np
+import random
+from gridPrinter import GridPrinter
+
+class BgColor:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    END_COLOR = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 class Neighbour:
     def __init__(self, position: Position, distance: int) -> None:
         self.position = position
         self.distance = distance
+        
+class GridPrinter:
+    def __init__(self) -> None:
+        self.paddSize = 5
+    
+    def display(self, grid: dict) -> None:
+        buffer = ''
+        
+        if len(grid) > 50:
+            self.paddSize = 3
+            
+        if len(grid) > 100:
+            self.paddSize = 1
+        
+        if len(grid) < 100:
+            buffer = '\n' + ''.ljust(self.paddSize, ' ')
+            for i in range(0, len(grid)):
+                buffer = buffer + str(i).ljust(self.paddSize, ' ')
+            
+        print(buffer)
+        
+        for i in range(0, len(grid)):
+            buffer = ''
+            for j in range(0, len(grid)):
+                if grid[i][j] == 'city':
+                    buffer = buffer + str('◼').ljust(self.paddSize, ' ')
+                elif grid[i][j] == 'highlight_city':
+                    buffer = buffer + BgColor.GREEN + str('◼').ljust(self.paddSize, ' ') + BgColor.END_COLOR
+                elif grid[i][j] == 'void':
+                    buffer = buffer + str('.').ljust(self.paddSize, ' ')
+                else:
+                    buffer = buffer + BgColor.GREEN + str(grid[i][j]).ljust(self.paddSize, ' ') + BgColor.END_COLOR
+            
+            if len(grid) < 100:
+                buffer = buffer + '\n'
+            
+            print(str(i).ljust(self.paddSize, ' ') + buffer)
+                
+        print('\n◼ ville')
+        print('_ vide\n')
 
 class Dijkstra:
     def __init__(self) -> None:
@@ -76,3 +131,37 @@ class Dijkstra:
                         neighbours.append(Neighbour(Position(i, j), abs(position.x - i) + abs(position.y - j)))
 
         return neighbours
+
+
+TABLE_SIZE = 20
+START_POS = np.int64(0)
+END_POS = np.int64(TABLE_SIZE-1)
+
+grid = []
+
+for i in range(0, TABLE_SIZE):
+    grid.insert(i, [])
+    for j in range(0, TABLE_SIZE):
+        if (random.randint(0, 10) == 0) or (i == START_POS and j == START_POS) or (i == END_POS and j == END_POS):
+            grid[i].insert(j, 'city')
+            continue
+        
+        grid[i].insert(j, 'void')
+        
+# GridPrinter().display(grid)
+
+start = time.time()
+dijkstra = Dijkstra()
+shortest_distance = dijkstra.findPath(grid, Position(0, 0), Position(TABLE_SIZE-1, TABLE_SIZE-1))
+    
+end = time.time()
+
+if None != shortest_distance:
+    print("Shortest distance:", shortest_distance)
+else:
+    print('No path found')
+
+if TABLE_SIZE < 100:
+    GridPrinter().display(grid)
+
+print("Temps écoulé: ", str(round(end - start, 2)), " secondes")
