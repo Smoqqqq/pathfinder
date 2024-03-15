@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize the grid
     for (int i = 0; i < grid_size * grid_size; i++) {
-        grid[i] = (rand() % 5 == 0 || i == 0 || i == grid_size * grid_size - 1) ? 'c' : '.';
+        grid[i] = (rand() % 2 == 0 || i == 0 || i == grid_size * grid_size - 1) ? 'c' : '.';
     }
 
     // Allocate memory for other arrays on the host
