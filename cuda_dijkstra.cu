@@ -1,8 +1,11 @@
+// Your code with revisions
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
 #include <time.h>
+#include <cuda_runtime.h>
 
 #define gpuErrorCheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -21,7 +24,7 @@ typedef struct {
     int y;
 } Position;
 
-__global__ void findPath(char *grid, int grid_size, Position start, Position end, double *distances, Position *previous, bool *visited, Position *path) {
+__global__ void findPath(char *grid, int grid_size, Position start, Position end, double *distances, Position *previous, bool *visited, Position *path, Position *queue) {
     int tid_x = blockIdx.x * blockDim.x + threadIdx.x;
     int tid_y = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -34,9 +37,6 @@ __global__ void findPath(char *grid, int grid_size, Position start, Position end
         distances[start.x * grid_size + start.y] = 0;
 
         int queue_size = 0;
-
-        // Allocate memory using cudaMallocManaged
-        __shared__ Position queue[1024];  // Assuming maximum block size of 1024
 
         queue[queue_size] = start;
         queue_size++;
@@ -98,16 +98,16 @@ __global__ void findPath(char *grid, int grid_size, Position start, Position end
             return;
         } 
         
-        printf("Shortest path:\n");
-        for (int i = path_size - 1; i >= 0; i--) {
-            printf("(%d, %d), ", path[i].x, path[i].y);
+        // Display the shortest path
+        // printf("Shortest path:\n");
+        for (int i = path_size - 1; i > 0; i--) {
             grid[path[i].x * grid_size + path[i].y] = 'X';
         }
-        printf("\n\n");
     } else {
-        printf("Invalid thread index: (%d, %d)\n", tid_x, tid_y);
+        // printf("Invalid thread index: (%d, %d)\n", tid_x, tid_y);
     }
 }
+
 
 void displayGrid(char *grid, int grid_size) {
     printf("\n");
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    // Allocate memory for the grid
+    // Allocate memory for the grid on the host
     char *grid;
     gpuErrorCheck(cudaMallocManaged(&grid, grid_size * grid_size * sizeof(char)));
 
@@ -148,6 +148,7 @@ int main(int argc, char *argv[]) {
         grid[i] = (rand() % 5 == 0 || i == 0 || i == grid_size * grid_size - 1) ? 'c' : '.';
     }
 
+    // Allocate memory for other arrays on the host
     double *distances;
     gpuErrorCheck(cudaMallocManaged(&distances, grid_size * grid_size * sizeof(double)));
 
@@ -160,30 +161,70 @@ int main(int argc, char *argv[]) {
     Position *path;
     gpuErrorCheck(cudaMallocManaged(&path, grid_size * grid_size * sizeof(Position)));
 
+    Position *queue;
+    gpuErrorCheck(cudaMallocManaged(&queue, grid_size * grid_size * sizeof(Position)));
+
     Position start = {0, 0};
     Position end = {grid_size - 1, grid_size - 1};
 
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, 0); // Assuming device 0
+
+    printf("Max threads per block: %d\n", prop.maxThreadsPerBlock);
+
+    // Define block dimension based on grid size
     int block_dim = 32;  // Define an appropriate block dimension
+    int cuda_grid_size = (grid_size + block_dim - 1) / block_dim;
 
     dim3 blockSize(block_dim, block_dim);
-    dim3 gridSize((grid_size + block_dim - 1) / block_dim, (grid_size + block_dim - 1) / block_dim);
+    dim3 gridSize(cuda_grid_size, cuda_grid_size);
+
+
+    printf("Grid size: %d, Block size: %d\n", cuda_grid_size, block_dim);
 
     clock_t start_time = clock();
-    findPath<<<gridSize, blockSize>>>(grid, grid_size, start, end, distances, previous, visited, path);
-    clock_t end_time = clock();
+    findPath<<<gridSize, blockSize>>>(grid, grid_size, start, end, distances, previous, visited, path, queue);
     gpuErrorCheck(cudaDeviceSynchronize());
+    clock_t end_time = clock();
 
-    if (grid_size < 100000) {
+    if (grid_size < 50) {
         displayGrid(grid, grid_size);
+    }
+
+    // Calculate the path size
+    int total_distance = 0;
+    for (int i = grid_size * grid_size; i > 0; i--) {
+        if (path[i].x == 0 && path[i].y == 0) {
+            continue;
+        }
+        int dx = abs(path[i].x - path[i - 1].x);
+        int dy = abs(path[i].y - path[i - 1].y);
+        total_distance += dx+dy;
+        if (path[i].x == end.x && path[i].y == end.y) {
+            printf("x: %d, y: %d", path[i].x, path[i].y);
+            break;
+        } else {
+            printf("x: %d, y: %d => ", path[i].x, path[i].y);
+        }
+    }
+
+    printf("\n");
+
+    if (total_distance == 0) {
+        printf("No path found.\n");
+    } else {
+        printf("Path found. Length: %d\n", total_distance);
     }
 
     printf("Execution time: %f seconds\n", (double)(end_time - start_time) / CLOCKS_PER_SEC);
 
+    // Free memory allocated on the host
     gpuErrorCheck(cudaFree(grid));
     gpuErrorCheck(cudaFree(distances));
     gpuErrorCheck(cudaFree(previous));
     gpuErrorCheck(cudaFree(visited));
     gpuErrorCheck(cudaFree(path));
+    gpuErrorCheck(cudaFree(queue));
 
     return 0;
 }
