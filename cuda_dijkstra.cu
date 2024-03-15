@@ -38,12 +38,9 @@ __global__ void findPath(char *grid, int grid_size, Position start, Position end
 
         if (idx == start.x * grid_size + start.y) {
             visited[idx] = true;
-            previous[idx].x = start.x;
-            previous[idx].y = start.y;
+            previous[idx].x = -1;  // Initialize with invalid value
+            previous[idx].y = -1;
         }
-
-        if (visited[end.x * grid_size + end.y])
-            return;
 
         if (grid[idx] == 'c') {
             for (int dx = -MAX_REACH; dx <= MAX_REACH; dx++) {
@@ -58,51 +55,30 @@ __global__ void findPath(char *grid, int grid_size, Position start, Position end
                             visited[neighbor_idx] = true;
                             previous[neighbor_idx].x = tid_x;
                             previous[neighbor_idx].y = tid_y;
-                            grid[neighbor_idx] = 'C';
                         }
                     }
                 }
             }
         }
 
-        if (visited[start.x * grid_size + start.y]) {
-            if (idx == start.x * grid_size + start.y) {
-                Position cur_position = start;
-                int count = 0;
+        if (idx == end.x * grid_size + end.y && visited[idx]) {
+            // Trace back to find the path
+            Position cur_position = end;
+            int count = 0;
 
-                while ((cur_position.x != start.x || cur_position.y != start.y) && count < grid_size * grid_size) {
-                    if (cur_position.x < 0 || cur_position.x >= grid_size || cur_position.y < 0 || cur_position.y >= grid_size) {
-                        break;
-                    }
-
-                    path[count++] = cur_position;
-
-                    if (cur_position.x >= 0 && cur_position.x < grid_size && cur_position.y >= 0 && cur_position.y < grid_size) {
-                        grid[cur_position.x * grid_size + cur_position.y] = 'X';
-                    }
-
-                    printf("Current position: (%d, %d)\n", cur_position.x, cur_position.y);
-
-                    // Get the previous position from the previous array
-                    cur_position = previous[cur_position.x * grid_size + cur_position.y];
-
-                    printf("Next position: (%d, %d)\n", cur_position.x, cur_position.y);
-
-                    // Ensure the current position is within bounds
-                    if (cur_position.x < 0 || cur_position.x >= grid_size || cur_position.y < 0 || cur_position.y >= grid_size) {
-                        break;
-                    }
-                }
-
-                if (count < grid_size * grid_size && end.x >= 0 && end.x < grid_size && end.y >= 0 && end.y < grid_size) {
-                    path[count++] = end;
-                }
-                *path_size = count;
+            while (!(cur_position.x == start.x && cur_position.y == start.y) && count < grid_size * grid_size) {
+                path[count++] = cur_position;
+                cur_position = previous[cur_position.x * grid_size + cur_position.y];
             }
+
+            if (count < grid_size * grid_size) {
+                path[count++] = start;
+            }
+
+            *path_size = count;
         }
     }
 }
-
 
 void displayGrid(char *grid, int grid_size, Position *path, int path_size) {
     printf("\n");
