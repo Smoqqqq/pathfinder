@@ -112,8 +112,8 @@ int findPath(char **grid, int grid_size, Position start, Position end) {
     if (path_size < 3 || path[0].x != end.x || path[0].y != end.y || path[path_size - 1].x != start.x || path[path_size - 1].y != start.y) {
         printf("No path found.\n");
         return false;
-    } 
-    
+    }
+
     printf("Shortest path:\n");
     for (int i = path_size - 1; i >= 0; i--) {
         printf("(%d, %d), ", path[i].x, path[i].y);
@@ -121,7 +121,6 @@ int findPath(char **grid, int grid_size, Position start, Position end) {
     }
     printf("\n\n");
 
-    // Free dynamically allocated memory
     for (int i = 0; i < grid_size; i++) {
         free(distances[i]);
         free(previous[i]);
@@ -152,7 +151,6 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    // Allocate memory for the grid
     grid = (char **)malloc(grid_size * sizeof(char *));
     for (int i = 0; i < grid_size; i++) {
         grid[i] = (char *)malloc(grid_size * sizeof(char));
@@ -178,7 +176,6 @@ int main(int argc, char *argv[]) {
 
     printf("execution time: %f seconds\n", (double)(end_time - start_time) / CLOCKS_PER_SEC);
 
-    // Free dynamically allocated memory for the grid
     for (int i = 0; i < grid_size; i++) {
         free(grid[i]);
     }

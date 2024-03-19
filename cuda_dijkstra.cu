@@ -1,5 +1,3 @@
-// Your code with revisions
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -8,13 +6,12 @@
 #include <cuda_runtime.h>
 
 #define gpuErrorCheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess) 
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
+
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
 }
 
 #define MAX_REACH 4
@@ -24,31 +21,35 @@ typedef struct {
     int y;
 } Position;
 
-__global__ void findPath(char *grid, int grid_size, Position start, Position end, double *distances, Position *previous, bool *visited, Position *path, Position *queue) {
+__global__ void
+findPath(char *grid, int grid_size, Position start, Position end, double *distances, Position *previous, bool *visited,
+         Position *path, Position *queue) {
     int tid_x = blockIdx.x * blockDim.x + threadIdx.x;
     int tid_y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (tid_x < grid_size && tid_y < grid_size) {
-        for (int i = 0; i < grid_size; i++) {
-            distances[tid_x * grid_size + i] = INFINITY;
-            visited[tid_x * grid_size + i] = false;
+        // Initialize distances and visited arrays
+        for (int i = 0; i < grid_size * grid_size; i++) {
+            distances[i] = INFINITY;
+            visited[i] = false;
         }
 
+        // Initialisation de la distance et la file d'attente
+        // TODO: passer sur le CPU
         distances[start.x * grid_size + start.y] = 0;
-
         int queue_size = 0;
+        queue[queue_size++] = start;
 
-        queue[queue_size] = start;
-        queue_size++;
-
+        // Dijkstra
         while (queue_size > 0) {
+            // On trouve le point le plus proche
             int min_index = 0;
-            double min_cost = distances[queue[0].x * grid_size + queue[0].y];
+            double min_distance = distances[queue[0].x * grid_size + queue[0].y];
             for (int i = 1; i < queue_size; i++) {
-                double cost = distances[queue[i].x * grid_size + queue[i].y];
-                if (cost < min_cost) {
+                double distance = distances[queue[i].x * grid_size + queue[i].y];
+                if (distance < min_distance) {
                     min_index = i;
-                    min_cost = cost;
+                    min_distance = distance;
                 }
             }
 
@@ -68,18 +69,20 @@ __global__ void findPath(char *grid, int grid_size, Position start, Position end
                     int x = cur_position.x + dx;
                     int y = cur_position.y + dy;
 
-                    if (x < 0 || x >= grid_size || y < 0 || y >= grid_size)
-                        continue;
-
-                    if (grid[x * grid_size + y] == 'c' && !visited[x * grid_size + y]) {
-                        double new_distance = distances[cur_position.x * grid_size + cur_position.y] + sqrtf(dx * dx + dy * dy);
-                        if (new_distance < distances[x * grid_size + y]) {
-                            distances[x * grid_size + y] = new_distance;
-                            grid[x * grid_size + y] = 'C';
-                            queue[queue_size].x = x;
-                            queue[queue_size].y = y;
-                            queue_size++;
-                            previous[x * grid_size + y] = cur_position;
+                    // Le voisin est il dans les limites du tableau
+                    if (x >= 0 && x < grid_size && y >= 0 && y < grid_size) {
+                        // Est ce que le voisin est une ville et n'a pas été visité
+                        if (grid[x * grid_size + y] == 'c' && !visited[x * grid_size + y]) {
+                            double new_distance =
+                                    distances[cur_position.x * grid_size + cur_position.y] + sqrtf(dx * dx + dy * dy);
+                            if (new_distance < distances[x * grid_size + y]) {
+                                distances[x * grid_size + y] = new_distance;
+                                grid[x * grid_size + y] = 'C';
+                                queue[queue_size].x = x;
+                                queue[queue_size].y = y;
+                                queue_size++;
+                                previous[x * grid_size + y] = cur_position;
+                            }
                         }
                     }
                 }
@@ -94,20 +97,18 @@ __global__ void findPath(char *grid, int grid_size, Position start, Position end
         }
         path[path_size++] = start;
 
-        if (path_size < 3 || path[0].x != end.x || path[0].y != end.y || path[path_size - 1].x != start.x || path[path_size - 1].y != start.y) {
+        // vériier que le chemin est correct
+        if (path_size < 3 || path[0].x != end.x || path[0].y != end.y || path[path_size - 1].x != start.x ||
+            path[path_size - 1].y != start.y) {
             return;
-        } 
-        
-        // Display the shortest path
-        // printf("Shortest path:\n");
+        }
+
+        // Show the path on the grid
         for (int i = path_size - 1; i > 0; i--) {
             grid[path[i].x * grid_size + path[i].y] = 'X';
         }
-    } else {
-        // printf("Invalid thread index: (%d, %d)\n", tid_x, tid_y);
     }
 }
-
 
 void displayGrid(char *grid, int grid_size) {
     printf("\n");
@@ -139,16 +140,14 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    // Allocate memory for the grid on the host
     char *grid;
     gpuErrorCheck(cudaMallocManaged(&grid, grid_size * grid_size * sizeof(char)));
 
     // Initialize the grid
     for (int i = 0; i < grid_size * grid_size; i++) {
-        grid[i] = (rand() % 2 == 0 || i == 0 || i == grid_size * grid_size - 1) ? 'c' : '.';
+        grid[i] = (rand() % 1 == 0 || i == 0 || i == grid_size * grid_size - 1) ? 'c' : '.';
     }
 
-    // Allocate memory for other arrays on the host
     double *distances;
     gpuErrorCheck(cudaMallocManaged(&distances, grid_size * grid_size * sizeof(double)));
 
@@ -172,26 +171,36 @@ int main(int argc, char *argv[]) {
 
     printf("Max threads per block: %d\n", prop.maxThreadsPerBlock);
 
-    // Define block dimension based on grid size
-    int block_dim = 32;  // Define an appropriate block dimension
+    int block_dim = 32;
     int cuda_grid_size = (grid_size + block_dim - 1) / block_dim;
 
     dim3 blockSize(block_dim, block_dim);
     dim3 gridSize(cuda_grid_size, cuda_grid_size);
 
 
-    printf("Grid size: %d, Block size: %d\n", cuda_grid_size, block_dim);
+    printf("Using block size: %d x %d\n", block_dim, block_dim);
+    printf("Using grid size: %d x %d, threads per block: %d\n", cuda_grid_size, cuda_grid_size, block_dim * block_dim);
+    printf("Total of threads: %d\n", cuda_grid_size * cuda_grid_size * block_dim * block_dim);
+    printf("Nb of grid cells: %d\n", grid_size * grid_size);
 
     clock_t start_time = clock();
     findPath<<<gridSize, blockSize>>>(grid, grid_size, start, end, distances, previous, visited, path, queue);
     gpuErrorCheck(cudaDeviceSynchronize());
     clock_t end_time = clock();
 
-    if (grid_size < 50) {
+//    for (int i = 0; i < grid_size; i++) {
+//        for (int j = 0; j < grid_size; j++) {
+//            if (!visited[i * grid_size + j] && grid[i * grid_size + j] == 'c') {
+//                printf("%d, %d was not visited\n", i, j);
+//            }
+//        }
+//    }
+
+    if (grid_size < 100) {
         displayGrid(grid, grid_size);
     }
 
-    // Calculate the path size
+    // Longueure du chemin
     int total_distance = 0;
     for (int i = grid_size * grid_size; i > 0; i--) {
         if (path[i].x == 0 && path[i].y == 0) {
@@ -199,7 +208,7 @@ int main(int argc, char *argv[]) {
         }
         int dx = abs(path[i].x - path[i - 1].x);
         int dy = abs(path[i].y - path[i - 1].y);
-        total_distance += dx+dy;
+        total_distance += dx + dy;
         if (path[i].x == end.x && path[i].y == end.y) {
             printf("x: %d, y: %d", path[i].x, path[i].y);
             break;
@@ -216,9 +225,8 @@ int main(int argc, char *argv[]) {
         printf("Path found. Length: %d\n", total_distance);
     }
 
-    printf("Execution time: %f seconds\n", (double)(end_time - start_time) / CLOCKS_PER_SEC);
+    printf("Execution time: %f seconds\n", (double) (end_time - start_time) / CLOCKS_PER_SEC);
 
-    // Free memory allocated on the host
     gpuErrorCheck(cudaFree(grid));
     gpuErrorCheck(cudaFree(distances));
     gpuErrorCheck(cudaFree(previous));
